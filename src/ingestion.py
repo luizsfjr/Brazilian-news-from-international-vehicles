@@ -183,7 +183,7 @@ class Ingestion:
                 self,
                 spark: SparkSession,
                 df_news: DataFrame,
-                output_base: str = "gs://gcp-lakehouse-raw/brazilian_news"
+                output_base: str = "gs://gcp-lc-datalakehouse-raw/brazilian_news"
     ) -> str:
         base_path = Path(output_base)
         parquet_path = str(base_path / "parquet")
