@@ -1,23 +1,25 @@
 # Brazilian News Ingestion (Guardian API -> Dataproc -> GCS)
 
-Este projeto executa ingestao de noticias do Guardian, trata paginacao e grava parquet no GCS usando PySpark em cluster Dataproc.
+This project ingests Guardian news data, handles pagination, and writes Parquet files to GCS using PySpark on a Dataproc cluster.
 
-## 1. Estrutura
+## 1. Structure
 
-- Codigo principal: `src/ingestion.py`
-- Segredo da API: Secret Manager
-- Destino de dados: `gs://<bucket>/brazilian_news/parquet`
+- Main code: `src/ingestion.py`
+- API secret: Secret Manager
+- Data destination: `gs://<bucket>/brazilian_news/parquet`
 
-## 2. Pre-requisitos
+## 2. Prerequisites
 
-- Projeto GCP ativo
-- APIs habilitadas:
+- Active GCP project
+- Enabled APIs:
   - Dataproc API
   - Secret Manager API
   - Cloud Storage API
-- `gcloud` autenticado no Cloud Shell
+- `gcloud` authenticated in Cloud Shell
 
-## 3. Variaveis de ambiente (Cloud Shell)
+## 3. Environment Variables (Cloud Shell)
+
+Update the variables below to match your environment:
 
 ```bash
 export PROJECT_ID="lc-qas-lake-house-0707"
@@ -28,26 +30,26 @@ export SECRET_ID="API_KEY_THE_GUARDIAN"
 gcloud config set project $PROJECT_ID
 ```
 
-## 4. Criar segredo da API no Secret Manager
+## 4. Create the API Secret in Secret Manager
 
 ```bash
-echo -n "SUA_API_KEY_GUARDIAN" | gcloud secrets create $SECRET_ID --data-file=-
+echo -n "YOUR_GUARDIAN_API_KEY" | gcloud secrets create $SECRET_ID --data-file=-
 ```
 
-Se o segredo ja existir:
+If the secret already exists:
 
 ```bash
-echo -n "SUA_API_KEY_GUARDIAN" | gcloud secrets versions add $SECRET_ID --data-file=-
+echo -n "YOUR_GUARDIAN_API_KEY" | gcloud secrets versions add $SECRET_ID --data-file=-
 ```
 
-## 5. Permissoes IAM minimas para o Dataproc
+## 5. Minimum IAM Permissions for Dataproc
 
 ```bash
 PROJECT_NUMBER=$(gcloud projects describe $PROJECT_ID --format='value(projectNumber)')
 SA="${PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
 ```
 
-Permitir leitura do segredo:
+Allow secret read access:
 
 ```bash
 gcloud secrets add-iam-policy-binding $SECRET_ID \
@@ -55,7 +57,7 @@ gcloud secrets add-iam-policy-binding $SECRET_ID \
   --role="roles/secretmanager.secretAccessor"
 ```
 
-Permitir escrita/leitura no bucket:
+Allow read/write access to the bucket:
 
 ```bash
 gcloud storage buckets add-iam-policy-binding gs://$BUCKET \
@@ -63,7 +65,7 @@ gcloud storage buckets add-iam-policy-binding gs://$BUCKET \
   --role="roles/storage.objectAdmin"
 ```
 
-Permitir worker Dataproc:
+Allow Dataproc worker role:
 
 ```bash
 gcloud projects add-iam-policy-binding $PROJECT_ID \
@@ -71,9 +73,9 @@ gcloud projects add-iam-policy-binding $PROJECT_ID \
   --role="roles/dataproc.worker"
 ```
 
-## 6. Rede (se cluster private/internal IP only)
+## 6. Networking (if the cluster is private/internal IP only)
 
-Se aparecer `Network is unreachable` ao instalar pacotes pip no startup, crie Cloud NAT:
+If you get `Network is unreachable` while installing pip packages during startup, create Cloud NAT:
 
 ```bash
 gcloud compute routers create dp-router \
@@ -87,7 +89,7 @@ gcloud compute routers nats create dp-nat \
   --auto-allocate-nat-external-ips
 ```
 
-## 7. Criar cluster Dataproc (versao enxuta)
+## 7. Create Dataproc Cluster (lightweight version)
 
 ```bash
 gcloud dataproc clusters create $CLUSTER \
@@ -99,13 +101,13 @@ gcloud dataproc clusters create $CLUSTER \
   --properties='^#^dataproc:pip.packages=google-cloud-secret-manager==2.25.0,google-auth==2.38.0,python-dotenv==1.0.1,requests==2.32.3'
 ```
 
-Se o nome ja existir:
+If the name already exists:
 
 ```bash
 gcloud dataproc clusters delete $CLUSTER --region=$REGION -q
 ```
 
-## 8. Enviar script para GCS
+## 8. Upload Script to GCS
 
 ```bash
 git clone your repo
@@ -115,7 +117,7 @@ git clone your repo
 gcloud storage cp src/ingestion.py gs://$BUCKET/jobs/ingestion.py
 ```
 
-## 9. Submeter job PySpark
+## 9. Submit PySpark Job
 
 ```bash
 gcloud dataproc jobs submit pyspark gs://$BUCKET/jobs/ingestion.py \
@@ -124,43 +126,42 @@ gcloud dataproc jobs submit pyspark gs://$BUCKET/jobs/ingestion.py \
   --properties="spark.yarn.appMasterEnv.GOOGLE_CLOUD_PROJECT=$PROJECT_ID,spark.executorEnv.GOOGLE_CLOUD_PROJECT=$PROJECT_ID"
 ```
 
-## 10. Validar execucao
+## 10. Validate Execution
 
-Listar jobs:
+List jobs:
 
 ```bash
 gcloud dataproc jobs list --region=$REGION
 ```
 
-Ver detalhes:
+Check details:
 
 ```bash
 gcloud dataproc jobs wait <JOB_ID> --region=$REGION --project=$PROJECT_ID
 ```
 
-Conferir arquivos de saida:
+Check output files:
 
 ```bash
 gcloud storage ls gs://$BUCKET/brazilian_news/parquet
 ```
 
-## 11. Troubleshooting rapido
+## 11. Quick Troubleshooting
 
-- Erro `Network is unreachable` no `pip install`
-  - Causa: cluster sem saida internet.
-  - Correcao: criar Cloud NAT.
+- Error `Network is unreachable` during `pip install`
+  - Cause: cluster has no internet egress.
+  - Fix: create Cloud NAT.
 
-- Erro `DISKS_TOTAL_GB quota`
-  - Causa: cluster grande demais para cota.
-  - Correcao: reduzir disco/maquina/workers (ex.: `--single-node`, `50GB`).
+- Error `DISKS_TOTAL_GB quota`
+  - Cause: cluster is too large for your quota.
+  - Fix: reduce disk/machine/workers (for example: `--single-node`, `50GB`).
 
-- Erro `ALREADY_EXISTS`
-  - Causa: nome de cluster ja usado.
-  - Correcao: deletar cluster antigo ou usar outro nome.
+- Error `ALREADY_EXISTS`
+  - Cause: cluster name already in use.
+  - Fix: delete old cluster or use a new name.
 
-## 12. Encerrar recursos
+## 12. Clean Up Resources
 
 ```bash
 gcloud dataproc clusters delete $CLUSTER --region=$REGION -q
 ```
-
