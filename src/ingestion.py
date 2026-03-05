@@ -9,6 +9,8 @@ from typing import Any
 import os
 from urllib3.util.retry import Retry
 from pyspark.sql.types import StructType, StructField, StringType, TimestampType, BooleanType
+from pyspark.sql.utils import AnalysisException
+
 
 class Ingestion:
 
@@ -185,14 +187,14 @@ class Ingestion:
                 df_news: DataFrame,
                 output_base: str = "gs://gcp-lc-datalakehouse-raw/brazilian_news"
     ) -> str:
-        base_path = Path(output_base)
-        parquet_path = str(base_path / "parquet")
 
-        if Path(parquet_path).exists():
+        base = output_base.rstrip("/")
+        parquet_path = f"{base}/parquet"
+
+        try:
             df_existing = spark.read.parquet(parquet_path)
             df_merged = df_existing.union(df_news).dropDuplicates(["id"])
-        else:
-            # First run — nothing on disk yet
+        except AnalysisException:
             df_merged = df_news.dropDuplicates(["id"])
 
         df_merged.write.mode("overwrite").parquet(parquet_path)
