@@ -12,15 +12,19 @@ from pyspark.sql.types import StructType, StructField, StringType, TimestampType
 
 class Ingestion:
 
-    def __init__(self, search: str):
+    def __init__(
+                self,
+                search: str,
+                secret_id: str = "API_KEY_THE_GUARDIAN",
+                secret_version: str = "latest"
+    ):
         load_dotenv()
-
-        self.api_key = os.getenv("API_KEY")
         self.search = search
+        self.api_key = self._resolve_api_key(secret_id, secret_version)
 
         # Check API KEY existence
         if not self.api_key:
-            raise EnvironmentError("API_KEY is not set in environment")
+            raise EnvironmentError("API_KEY is not configured")
 
         # Retry logic with backoff for transient network errors
         self.session = requests.Session()
@@ -30,6 +34,46 @@ class Ingestion:
             status_forcelist=[429, 500, 502, 503, 504],
         )
         self.session.mount("https://", HTTPAdapter(max_retries=retries))
+
+    def _resolve_api_key(self, secret_id: str, secret_version: str) -> str:
+        # Local/dev fallback
+        env_key = os.getenv("API_KEY_THE_GUARDIAN")
+        if env_key:
+            return env_key
+
+        project_id = os.getenv("PROJECT_ID")
+        secret_id = os.getenv("API_KEY_THE_GUARDIAN", secret_id)
+
+        if not project_id:
+            try:
+                import google.auth
+                _, detected_project = google.auth.default()
+                project_id = detected_project
+            except Exception:
+                project_id = None
+
+        if not project_id:
+            raise EnvironmentError(
+                "Set GOOGLE_CLOUD_PROJECT (or GCP_PROJECT) to read API key from Secret Manager."
+            )
+
+        try:
+            from google.cloud import secretmanager
+
+            client = secretmanager.SecretManagerServiceClient()
+            name = (
+                f"projects/{project_id}/secrets/{secret_id}/versions/{secret_version}"
+            )
+            response = client.access_secret_version(name=name)
+            api_key = response.payload.data.decode("utf-8").strip()
+            if not api_key:
+                raise EnvironmentError(f"Secret {secret_id} is empty.")
+            return api_key
+        except Exception as exc:
+            raise EnvironmentError(
+                "Could not load API key from Secret Manager. "
+                "Check secret name, permissions, and google-cloud-secret-manager dependency."
+            ) from exc
     
     def get_data(
                 self,
@@ -137,8 +181,9 @@ class Ingestion:
 
     def save_dataframe(
                 self,
+                spark: SparkSession,
                 df_news: DataFrame,
-                output_base: str = "C:/spark-output/brazillian_news/raw"
+                output_base: str = "gs://gcp-lakehouse-raw/brazilian_news"
     ) -> str:
         base_path = Path(output_base)
         parquet_path = str(base_path / "parquet")
@@ -168,14 +213,14 @@ if __name__ == "__main__":
     # Pass from_date explicitly to override: ingest1.get_data(from_date="2026-01-01")
     result = ingest1.get_data()
     status = result.get("response", {}).get("status", "unknown")
-
-    if status == "ok":
-        df_news = ingest1.to_spark_dataframe(spark, result)
-        df_news.printSchema()
-        df_news.show(truncate=False)
-        parquet_path = ingest1.save_dataframe(df_news)
-        print(f"Saved parquet to: {parquet_path}")
-    else:
-        print("****Fail in get data****")
-    
-    spark.stop()
+    try:
+        if status == "ok":
+            df_news = ingest1.to_spark_dataframe(spark, result)
+            df_news.printSchema()
+            df_news.show(truncate=False)
+            parquet_path = ingest1.save_dataframe(spark, df_news)
+            print(f"Saved parquet to: {parquet_path}")
+        else:
+            print("****Fail in get data****")
+    finally:
+        spark.stop()
