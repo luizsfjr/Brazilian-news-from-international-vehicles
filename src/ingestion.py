@@ -178,13 +178,15 @@ class Ingestion:
         return {"response": merged_response}
 
     def to_raw_data(
-                self, 
+                self,
+                spark: SparkSession, 
                 result: dict[str, Any]
     ) -> DataFrame:
         """Normalize API records into a flat raw structure.
 
         Args:
             result: Full API response dictionary returned by `get_data`.
+            spark: Active Spark Session
 
         Returns:
             Spark Dataframe
@@ -192,6 +194,7 @@ class Ingestion:
         response_block = result.get("response", {})
         results = response_block.get("results", [])
 
+        run_id = str(uuid.uuid4())
         rows = [
             {
                 "id": item.get("id"),
@@ -207,7 +210,7 @@ class Ingestion:
                 "pillar_name": item.get("pillarName"),
                 # Ingestion metadata
                 "_ingested_at_utc":   datetime.now(timezone.utc).isoformat(),
-                "_run_id":            str(uuid.uuid4()),
+                "_run_id":            run_id,
                 "_search_term":       self.search,
             }
             for item in results
@@ -255,10 +258,10 @@ if __name__ == "__main__":
     status = result.get("response", {}).get("status", "unknown")
     try:
         if status == "ok":
-            df_news = ingest1.to_raw_data(result)
+            df_news = ingest1.to_raw_data(spark,result)
             df_news.printSchema()
             df_news.show(truncate=False)
-            parquet_path = ingest1.save_dataframe(df_news,r"C:\spark-output\brazillian_news\raw")
+            parquet_path = ingest1.save_dataframe(df_news)
             print(f"Saved parquet to: {parquet_path}")
         else:
             print("****Fail in get data****")
