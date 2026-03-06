@@ -1,0 +1,14 @@
+-- definitions/sources/tb_source_brazil_tag.sqlx
+config {
+  type: "operations",
+  hasOutput: true,
+  schema: "the_guardian",
+  description: "External table pointing to raw parquet files in GCS",
+  tags: ["raw"]
+}
+
+CREATE OR REPLACE EXTERNAL TABLE ${self()}
+OPTIONS (
+  format = 'PARQUET',
+  uris = ['gs://gcp-lc-datalakehouse-raw/brazilian_news/parquet-*']
+)
