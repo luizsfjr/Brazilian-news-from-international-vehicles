@@ -1,0 +1,22 @@
+config {
+  type: "table",
+  schema: "the_guardian",
+  name: "tb_dim_section",
+  bigquery: {
+    clusterBy: ["section_id"]
+  },
+  assertions: {
+    uniqueKey: ["section_id"],
+    nonNull: ["section_id"],
+  },
+  tags: ["dim","dim_section"]
+}
+
+
+SELECT
+    DISTINCT section_id,
+    section_name
+FROM
+    ${ref("tb_silver")}
+WHERE
+    LENGTH(section_name) > 0

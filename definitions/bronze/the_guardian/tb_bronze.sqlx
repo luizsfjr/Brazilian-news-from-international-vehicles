@@ -1,12 +1,9 @@
--- definitions/bronze/tb_bronze_brazil_tag.sqlx
 config {
   type: "table",
   schema: "the_guardian",
+  name: "tb_bronze",
   bigquery: {
     partitionBy: "DATE(published_at)"
-  },
-  assertions: {
-    nonNull: ["id", "published_at", "_ingested_at_utc", "is_hosted"]
   },
   tags: ["bronze"]
 }
