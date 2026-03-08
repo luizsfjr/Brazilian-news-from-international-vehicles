@@ -1,0 +1,5 @@
+defaultProject: lc-qas-lake-house-0707
+defaultDataset: dataform
+defaultLocation: us-central1
+defaultAssertionDataset: the_guardian_assertions
+dataformCoreVersion: 3.0.42

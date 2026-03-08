@@ -1,0 +1,46 @@
+config {
+  type: "table",
+  schema: "the_guardian",
+  name: "tb_bronze",
+  bigquery: {
+    partitionBy: "DATE(published_at)"
+  },
+  tags: ["bronze"]
+}
+
+WITH _source AS (
+  SELECT * FROM ${ref("tb_raw")}
+  ${when(incremental(), `WHERE _ingested_at_utc > (SELECT MAX(_ingested_at_utc) FROM ${self()})`)}
+),
+
+casted AS (
+  SELECT
+    id,
+    type,
+    section_id,
+    section_name,
+    pillar_id,
+    pillar_name,
+    title,
+    web_url,
+    api_url,
+    _run_id,
+    _search_term,
+    SAFE_CAST(published_at     AS TIMESTAMP) AS published_at,
+    SAFE_CAST(is_hosted        AS BOOLEAN)   AS is_hosted,
+    SAFE_CAST(_ingested_at_utc AS TIMESTAMP) AS _ingested_at_utc
+  FROM 
+    _source
+)
+
+-- GATE: invalid records never enter Bronze
+SELECT 
+  * 
+FROM 
+  casted
+WHERE 
+  1=1
+  AND id IS NOT NULL
+  AND SAFE_CAST(published_at AS TIMESTAMP) IS NOT NULL
+  AND SAFE_CAST(_ingested_at_utc AS TIMESTAMP) IS NOT NULL
+  AND is_hosted IS NOT NULL

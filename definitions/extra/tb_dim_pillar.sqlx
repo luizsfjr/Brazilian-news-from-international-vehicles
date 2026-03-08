@@ -1,0 +1,22 @@
+config {
+  type: "table",
+  schema: "the_guardian",
+  name: "tb_dim_pillar",
+  bigquery: {
+    clusterBy: ["pillar_id"]
+  },
+  assertions: {
+    uniqueKey: ["pillar_id"],
+    nonNull: ["pillar_id"],
+  },
+  tags: ["dim","dim_pillar"]
+}
+
+
+SELECT
+    DISTINCT pillar_id,
+    pillar_name
+FROM
+    ${ref("tb_silver")}
+WHERE
+    LENGTH(pillar_name) > 0

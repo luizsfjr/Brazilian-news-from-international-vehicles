@@ -1,0 +1,26 @@
+config {
+  type: "table",
+  schema: "the_guardian",
+  name: "tb_silver",
+  bigquery: {
+    partitionBy: "DATE(published_at)"
+  },
+  assertions: {
+    nonNull: ["id", "published_at"],
+    uniqueKey: ["id"]
+  },
+  tags: ["silver"]
+}
+
+WITH deduped AS (
+  SELECT *,
+    ROW_NUMBER() OVER (
+      PARTITION BY id
+      ORDER BY _ingested_at_utc DESC
+    ) AS row_num
+  FROM ${ref("tb_bronze")}
+)
+
+SELECT * EXCEPT(row_num)
+FROM deduped
+WHERE row_num = 1

@@ -1,0 +1,15 @@
+config {
+  type: "table",
+  schema: "the_guardian",
+  name: "tb_content",
+  bigquery: {
+    partitionBy: "published_day"
+  },
+  tags: ["gold","content"]
+}
+
+SELECT
+   * EXCEPT (pillar_name, section_name, _ingested_at_utc, _run_id, published_at),
+   DATE(published_at) AS published_day
+FROM
+    ${ref("tb_silver")}

@@ -1,0 +1,25 @@
+config {
+  type: "table",
+  schema: "the_guardian",
+  name: "tb_news_qty",
+  bigquery: {
+    partitionBy: "published_day"
+  },
+  assertions: {
+    uniqueKey: ["published_day"],
+    rowConditions: [
+        "qtd_news > 0"
+    ]
+  },
+  tags: ["gold","news"]
+}
+
+SELECT
+   COUNT(ID) AS qtd_news,
+   DATE(published_at) AS published_day
+FROM
+    ${ref("tb_silver")}
+WHERE
+    LENGTH(ID) > 0
+GROUP BY
+    published_day
