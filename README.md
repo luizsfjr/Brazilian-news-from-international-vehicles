@@ -5,6 +5,7 @@ This project ingests Guardian news data, handles pagination, and writes Parquet 
 ## 1. Structure
 
 - Main code: `src/ingestion.py`
+- Orchestration DAG (Cloud Composer): `src/orchestrate_dataproc_dataform.py`
 - API secret: Secret Manager
 - Data destination: `gs://<bucket>/brazilian_news/parquet`
 
@@ -25,7 +26,7 @@ Update the variables below to match your environment:
 export PROJECT_ID="lc-qas-lake-house-0707"
 export REGION="us-central1"
 export CLUSTER="cluster-news"
-export BUCKET="gcp-lc-datalakehouse-raw"
+export BUCKET="lc-qas-lake-house-0707-dataproc-news"
 export SECRET_ID="API_KEY_THE_GUARDIAN"
 gcloud config set project $PROJECT_ID
 ```
