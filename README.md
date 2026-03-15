@@ -2,10 +2,23 @@
 
 This project ingests Guardian news data, handles pagination, and writes Parquet files to GCS using PySpark on a Dataproc cluster.
 
+## Data Architecture
+
+The pipeline follows a **Medallion Architecture** (Bronze → Silver → Gold), orchestrated by Cloud Composer and powered by PySpark on Dataproc.
+
+![Data Architecture](utils/data_architecture.svg)
+
+| Layer | Location | Description |
+|-------|----------|-------------|
+| **Source** | The Guardian API | Paginated news articles filtered for Brazil |
+| **Orchestration** | Cloud Composer (Airflow) | DAG triggers `ingestion.py` on Dataproc; API key fetched from Secret Manager |
+| **Bronze** | `gs://<bucket>/brazilian_news/parquet` | Raw Parquet files, as ingested — no transformations |
+| **Silver** | Dataform (`/definitions`) | Deduplication, type casting, null handling, schema validation |
+| **Gold** | Dataform (`/definitions`) | Aggregated business metrics and topic summaries, analytics-ready |
+
 ## 1. Structure
 
 - Main code: `src/ingestion.py`
-- Orchestration DAG (Cloud Composer): `src/orchestrate_dataproc_dataform.py`
 - API secret: Secret Manager
 - Data destination: `gs://<bucket>/brazilian_news/parquet`
 
@@ -26,7 +39,7 @@ Update the variables below to match your environment:
 export PROJECT_ID="lc-qas-lake-house-0707"
 export REGION="us-central1"
 export CLUSTER="cluster-news"
-export BUCKET="lc-qas-lake-house-0707-dataproc-news"
+export BUCKET="gcp-lc-datalakehouse-raw"
 export SECRET_ID="API_KEY_THE_GUARDIAN"
 gcloud config set project $PROJECT_ID
 ```
@@ -152,11 +165,9 @@ gcloud storage ls gs://$BUCKET/brazilian_news/parquet
 - Error `Network is unreachable` during `pip install`
   - Cause: cluster has no internet egress.
   - Fix: create Cloud NAT.
-
 - Error `DISKS_TOTAL_GB quota`
   - Cause: cluster is too large for your quota.
   - Fix: reduce disk/machine/workers (for example: `--single-node`, `50GB`).
-
 - Error `ALREADY_EXISTS`
   - Cause: cluster name already in use.
   - Fix: delete old cluster or use a new name.
