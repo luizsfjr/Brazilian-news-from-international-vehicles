@@ -8,13 +8,13 @@ The pipeline follows a **Medallion Architecture** (Bronze → Silver → Gold), 
 
 ![Data Architecture](utils/data_architecture.svg)
 
-| Layer | Location | Description |
+| Layer | Location/Engine| Description |
 |-------|----------|-------------|
 | **Source** | The Guardian API | Paginated news articles filtered for Brazil |
 | **Orchestration** | Cloud Composer (Airflow) | DAG triggers `ingestion.py` on Dataproc; API key fetched from Secret Manager |
 | **Bronze** | `gs://<bucket>/brazilian_news/parquet` | Raw Parquet files, as ingested — no transformations |
-| **Silver** | Dataform (`/definitions`) | Deduplication, type casting, null handling, schema validation |
-| **Gold** | Dataform (`/definitions`) | Aggregated business metrics and topic summaries, analytics-ready |
+| **Silver** | Dataform/BigQuery (`/definitions`) | Deduplication, type casting, null handling, schema validation |
+| **Gold** | Dataform/BigQuery (`/definitions`) | Aggregated business metrics and topic summaries, analytics-ready |
 
 ## 1. Structure
 
