@@ -1,7 +1,3 @@
-# Brazilian News Ingestion (Guardian API -> Dataproc -> GCS)
-
-This project ingests Guardian news data, handles pagination, and writes Parquet files to GCS using PySpark on a Dataproc cluster.
-
 ## Data Architecture
 
 The pipeline follows a **Medallion Architecture** (Bronze → Silver → Gold), orchestrated by Cloud Composer and powered by PySpark on Dataproc.
