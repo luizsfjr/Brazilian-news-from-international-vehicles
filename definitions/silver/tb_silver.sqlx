@@ -12,6 +12,11 @@ config {
   tags: ["silver"]
 }
 
+// schema-evolution: v3
+// Added columns   : testSchemaEvolution
+// Review: update assertions/docs if needed.
+
+
 WITH deduped AS (
   SELECT *,
     ROW_NUMBER() OVER (
