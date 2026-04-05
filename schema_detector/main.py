@@ -19,10 +19,17 @@ def get_latest_snapshot() -> list | None:
     rows = list(client.query(query).result())
     if not rows:
         return None
-    return json.loads(rows[0]["schema_snapshot"])
+    
+    snapshot = rows[0]["schema_snapshot"]
+    
+    # BQ may return it already parsed as a list or as a string
+    if isinstance(snapshot, list):
+        return snapshot
+    return json.loads(snapshot)
 
 
-def get_current_schema() -> list:
+def get_live_schema() -> list:
+    """Gets the current live schema directly from tb_bronze."""
     table = client.get_table(REFERENCE_TABLE)
     return [
         {
@@ -85,22 +92,26 @@ def detect_schema_changes(cloud_event):
     print(f"🔍 Checking schema for: {REFERENCE_TABLE}")
 
     try:
-        current_schema  = get_current_schema()
+        # 1. Get last recorded schema from governance table
         latest_snapshot = get_latest_snapshot()
+
+        # 2. Get live schema from tb_bronze
+        live_schema = get_live_schema()
 
         # No previous version — insert initial
         if latest_snapshot is None:
             print("No previous version found. Inserting initial schema...")
-            insert_new_version(current_schema, "INITIAL", "Initial schema version")
+            insert_new_version(live_schema, "INITIAL", "Initial schema version")
             return
 
-        added, removed, modified = detect_changes(latest_snapshot, current_schema)
+        # 3. Compare governance snapshot vs live schema
+        added, removed, modified = detect_changes(latest_snapshot, live_schema)
 
         if not added and not removed and not modified:
             print("✅ No schema changes detected.")
             return
 
-        # Build summary
+        # 4. Build summary and insert new version
         parts = []
         if added:
             names = ", ".join(f["name"] for f in added)
@@ -124,7 +135,7 @@ def detect_schema_changes(cloud_event):
             "MIXED"
         )
 
-        insert_new_version(current_schema, change_type, " | ".join(parts))
+        insert_new_version(live_schema, change_type, " | ".join(parts))
 
     except Exception as e:
         print(f"❌ Error: {e}")
