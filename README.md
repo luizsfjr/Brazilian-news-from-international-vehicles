@@ -1,6 +1,16 @@
-# Brazilian News Ingestion (Guardian API -> Dataproc -> GCS)
+## Data Architecture
 
-This project ingests Guardian news data, handles pagination, and writes Parquet files to GCS using PySpark on a Dataproc cluster.
+The pipeline follows a **Medallion Architecture** (Bronze → Silver → Gold), orchestrated by Cloud Composer and powered by PySpark on Dataproc.
+
+![Data Architecture](utils/data_architecture.svg)
+
+| Layer | Location/Engine| Description |
+|-------|----------|-------------|
+| **Source** | The Guardian API | Paginated news articles filtered for Brazil |
+| **Orchestration** | Cloud Composer (Airflow) | DAG triggers `ingestion.py` on Dataproc; API key fetched from Secret Manager |
+| **Bronze** | `gs://<bucket>/brazilian_news/parquet` | Raw Parquet files, as ingested — no transformations |
+| **Silver** | Dataform/BigQuery (`/definitions`) | Deduplication, type casting, null handling, schema validation |
+| **Gold** | Dataform/BigQuery (`/definitions`) | Aggregated business metrics and topic summaries, analytics-ready |
 
 ## 1. Structure
 
@@ -151,11 +161,9 @@ gcloud storage ls gs://$BUCKET/brazilian_news/parquet
 - Error `Network is unreachable` during `pip install`
   - Cause: cluster has no internet egress.
   - Fix: create Cloud NAT.
-
 - Error `DISKS_TOTAL_GB quota`
   - Cause: cluster is too large for your quota.
   - Fix: reduce disk/machine/workers (for example: `--single-node`, `50GB`).
-
 - Error `ALREADY_EXISTS`
   - Cause: cluster name already in use.
   - Fix: delete old cluster or use a new name.
